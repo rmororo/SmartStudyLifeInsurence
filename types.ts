@@ -2,13 +2,20 @@
 export interface QuestionData {
   id: string;
   image: string; // base64
-  extractedText: {
-    question: string;
-    options: { [key: string]: string };
+  texts: {
+    question: { pt: string; en: string; es: string };
+    options: {
+      pt: { [key: string]: string };
+      en: { [key: string]: string };
+      es: { [key: string]: string };
+    };
   };
   correctAnswer: string;
-  explanationPT: string;
-  explanationEN: string;
+  explanations: {
+    pt: string;
+    en: string;
+    es: string;
+  };
 }
 
 export interface ExamSession {

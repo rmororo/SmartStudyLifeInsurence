@@ -3,21 +3,18 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 const MODEL_NAME = 'gemini-3-flash-preview';
 
-// Lógica de retry com backoff exponencial aprimorada para limites de cota
 async function retryWithBackoff<T>(fn: () => Promise<T>, retries = 5, initialDelay = 3000): Promise<T> {
   let delay = initialDelay;
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
     } catch (error: any) {
-      // Verifica se o erro é de cota excedida (429) ou erro interno de servidor (5xx)
       const isQuotaExceeded = error.message?.includes("429") || error.status === 429 || error.message?.includes("RESOURCE_EXHAUSTED");
       const isRetryable = isQuotaExceeded || (error.status >= 500 && error.status < 600);
       
       if (i < retries - 1 && isRetryable) {
-        // Se for erro de cota, o delay aumenta mais rapidamente
         const waitTime = isQuotaExceeded ? delay * (i + 1.5) : delay;
-        console.warn(`[Gemini API] Limite atingido ou erro. Tentativa ${i + 1}/${retries}. Aguardando ${waitTime}ms...`);
+        console.warn(`[Gemini API] Retrying (${i + 1}/${retries}) in ${waitTime}ms...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         delay *= 2; 
         continue;
@@ -32,15 +29,43 @@ export async function analyzeQuestionImage(base64Image: string): Promise<any> {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const prompt = `
-    Analyze this exam question image. 
-    1. Extract the question text.
-    2. Extract the multiple choice options (A, B, C, D, etc.).
-    3. Identify the correct answer (A, B, C, D, etc.).
-    4. Provide a detailed explanation of why that answer is correct and why the others are wrong in Portuguese.
-    5. Provide the same detailed explanation in English.
+    Analyze this exam question image and provide a TRILINGUAL output (Portuguese, English, Spanish).
+    1. Extract question text and translate it to all 3 languages.
+    2. Extract all options (A, B, C, D, E) and translate each one to all 3 languages.
+    3. Identify the correct answer letter.
+    4. Provide a detailed pedagogical explanation in all 3 languages.
     
-    Output MUST be in the specified JSON format.
+    CRITICAL: Ensure technical terms are translated accurately according to professional exam standards.
   `;
+
+  const languageObjectSchema = {
+    type: Type.OBJECT,
+    properties: {
+      pt: { type: Type.STRING },
+      en: { type: Type.STRING },
+      es: { type: Type.STRING },
+    },
+    required: ["pt", "en", "es"]
+  };
+
+  const optionsLanguageSchema = {
+    type: Type.OBJECT,
+    properties: {
+      pt: { 
+        type: Type.OBJECT, 
+        properties: { A: {type: Type.STRING}, B: {type: Type.STRING}, C: {type: Type.STRING}, D: {type: Type.STRING}, E: {type: Type.STRING} }
+      },
+      en: { 
+        type: Type.OBJECT, 
+        properties: { A: {type: Type.STRING}, B: {type: Type.STRING}, C: {type: Type.STRING}, D: {type: Type.STRING}, E: {type: Type.STRING} }
+      },
+      es: { 
+        type: Type.OBJECT, 
+        properties: { A: {type: Type.STRING}, B: {type: Type.STRING}, C: {type: Type.STRING}, D: {type: Type.STRING}, E: {type: Type.STRING} }
+      },
+    },
+    required: ["pt", "en", "es"]
+  };
 
   return retryWithBackoff(async () => {
     const response = await ai.models.generateContent({
@@ -61,33 +86,23 @@ export async function analyzeQuestionImage(base64Image: string): Promise<any> {
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            question: { type: Type.STRING },
-            options: {
-              type: Type.OBJECT,
-              properties: {
-                A: { type: Type.STRING },
-                B: { type: Type.STRING },
-                C: { type: Type.STRING },
-                D: { type: Type.STRING },
-                E: { type: Type.STRING },
-              }
-            },
-            correctAnswer: { type: Type.STRING, description: "Single letter representing the correct option" },
-            explanationPT: { type: Type.STRING },
-            explanationEN: { type: Type.STRING },
+            question: languageObjectSchema,
+            options: optionsLanguageSchema,
+            correctAnswer: { type: Type.STRING },
+            explanations: languageObjectSchema,
           },
-          required: ["question", "options", "correctAnswer", "explanationPT", "explanationEN"]
+          required: ["question", "options", "correctAnswer", "explanations"]
         }
       }
     });
 
     try {
       const text = response.text;
-      if (!text) throw new Error("Empty response from AI");
+      if (!text) throw new Error("Empty response");
       return JSON.parse(text);
     } catch (e) {
-      console.error("Failed to parse Gemini response", e);
-      throw new Error("Could not analyze the question image correctly.");
+      console.error("Parse Error", e);
+      throw new Error("Invalid AI response format");
     }
   });
 }
