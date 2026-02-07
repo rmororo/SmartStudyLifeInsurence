@@ -1,0 +1,5 @@
+{
+  "name": "AI Bilingual Exam Prep Insurence Life",
+  "description": "A professional bilingual exam simulator that uses Gemini AI to analyze question images (PNG) and provide instant feedback and explanations in Portuguese and English.",
+  "requestFramePermissions": []
+}
