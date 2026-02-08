@@ -3,20 +3,26 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 const MODEL_NAME = 'gemini-3-flash-preview';
 
-async function retryWithBackoff<T>(fn: () => Promise<T>, retries = 5, initialDelay = 3000): Promise<T> {
+/**
+ * Enhanced retry logic with exponential backoff.
+ * For 429 errors, we use a much larger initial delay to allow quota to reset.
+ */
+async function retryWithBackoff<T>(fn: () => Promise<T>, retries = 6, initialDelay = 5000): Promise<T> {
   let delay = initialDelay;
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
     } catch (error: any) {
-      const isQuotaExceeded = error.message?.includes("429") || error.status === 429 || error.message?.includes("RESOURCE_EXHAUSTED");
+      const errorMsg = error.message || "";
+      const isQuotaExceeded = errorMsg.includes("429") || error.status === 429 || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota");
       const isRetryable = isQuotaExceeded || (error.status >= 500 && error.status < 600);
       
       if (i < retries - 1 && isRetryable) {
+        // If it's a quota error, wait even longer
         const waitTime = isQuotaExceeded ? delay * (i + 1.5) : delay;
-        console.warn(`[Gemini API] Retrying (${i + 1}/${retries}) in ${waitTime}ms...`);
+        console.warn(`[Gemini API] Quota reached or server error. Attempt ${i + 1}/${retries}. Retrying in ${Math.round(waitTime/1000)}s...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
-        delay *= 2; 
+        delay *= 2.5; // Aggressive backoff for quota issues
         continue;
       }
       throw error;
@@ -98,10 +104,10 @@ export async function analyzeQuestionImage(base64Image: string): Promise<any> {
 
     try {
       const text = response.text;
-      if (!text) throw new Error("Empty response");
+      if (!text) throw new Error("Empty response from AI");
       return JSON.parse(text);
     } catch (e) {
-      console.error("Parse Error", e);
+      console.error("Parse Error during JSON extraction", e);
       throw new Error("Invalid AI response format");
     }
   });
