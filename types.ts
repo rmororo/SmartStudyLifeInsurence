@@ -43,5 +43,23 @@ export enum AppStatus {
   LOADING = 'LOADING',
   EXAM = 'EXAM',
   RESULT = 'RESULT',
-  HISTORY = 'HISTORY'
+  HISTORY = 'HISTORY',
+  STATS = 'STATS'
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL: string;
+  totalExams: number;
+  averageScore: number;
+  lastExamDate: string;
+}
+
+export interface GlobalStats {
+  totalUsers: number;
+  totalExams: number;
+  averageGlobalScore: number;
+  topPerformers: { name: string; score: number }[];
 }

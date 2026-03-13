@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email']) &&
+             data.uid is string &&
+             data.email is string;
+    }
+
+    function isValidExam(data) {
+      return data.keys().hasAll(['id', 'userId', 'score', 'totalQuestions']) &&
+             data.userId == request.auth.uid;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated(); // Allow reading other users for comparison if needed
+      allow write: if isOwner(userId) && isValidUser(request.resource.data);
+    }
+
+    // Exam results
+    match /exams/{examId} {
+      allow read: if isAuthenticated(); // Allow reading all exams for global stats calculation
+      allow create: if isAuthenticated() && isValidExam(request.resource.data);
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Global stats (optional summary)
+    match /stats/{statId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only updated via backend/admin (or we can skip this and calculate on client)
+    }
+  }
+}

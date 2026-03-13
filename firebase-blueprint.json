@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user profile and statistics summary.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "totalExams": { "type": "integer" },
+        "averageScore": { "type": "number" },
+        "lastExamDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Exam": {
+      "title": "Exam Session",
+      "description": "Stores the results of a completed exam.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "folderName": { "type": "string" },
+        "score": { "type": "integer" },
+        "totalQuestions": { "type": "integer" },
+        "accuracy": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "questions": { "type": "array" }
+      },
+      "required": ["id", "userId", "score", "totalQuestions"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and stats"
+    },
+    "/exams/{examId}": {
+      "schema": "Exam",
+      "description": "Exam results for all users"
+    }
+  }
+}

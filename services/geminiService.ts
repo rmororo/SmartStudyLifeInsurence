@@ -32,7 +32,15 @@ async function retryWithBackoff<T>(fn: () => Promise<T>, retries = 6, initialDel
 }
 
 export async function analyzeQuestionImage(base64Image: string): Promise<any> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API Key not found. Please check your environment variables.");
+  }
+  
+  const ai = new GoogleGenAI({ apiKey });
+  
+  const mimeType = base64Image.match(/data:([^;]+);base64/)?.[1] || 'image/png';
+  const base64Data = base64Image.split(',')[1] || base64Image;
   
   const prompt = `
     Analyze this exam question image and provide a TRILINGUAL output (Portuguese, English, Spanish).
@@ -80,8 +88,8 @@ export async function analyzeQuestionImage(base64Image: string): Promise<any> {
         parts: [
           {
             inlineData: {
-              mimeType: 'image/png',
-              data: base64Image.split(',')[1] || base64Image,
+              mimeType,
+              data: base64Data,
             },
           },
           { text: prompt },
